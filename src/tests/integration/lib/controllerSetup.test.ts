@@ -136,3 +136,46 @@ describe('ControllerSetup.disableDiagnosticReporting()', () => {
         expect(written).to.have.length(0);
     });
 });
+
+describe('ControllerSetup.createTestDirPackageJson()', () => {
+    let tmp: string;
+    let adapterDir: string;
+    let testDir: string;
+
+    beforeEach(() => {
+        tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'testing-pkg-'));
+        adapterDir = path.join(tmp, 'ioBroker.demo');
+        testDir = path.join(tmp, 'test');
+        fs.outputJSONSync(path.join(adapterDir, 'package.json'), { name: 'iobroker.demo', version: '0.0.1' });
+        fs.outputJSONSync(path.join(adapterDir, 'io-package.json'), { common: { name: 'demo' } });
+    });
+
+    afterEach(() => {
+        fs.removeSync(tmp);
+    });
+
+    it('installs the requested JS-Controller version and esbuild-register', () => {
+        const packageJson = new ControllerSetup(adapterDir, testDir).createTestDirPackageJson('7.2.2');
+        expect(packageJson.dependencies).to.deep.equal({
+            'iobroker.js-controller': '7.2.2',
+            '@alcalzone/esbuild-register': '^2.5.1-1',
+        });
+    });
+
+    it('forces a fixed esbuild version (GHSA-67mh-4wv8-2f99) for esbuild-register only', () => {
+        const packageJson = new ControllerSetup(adapterDir, testDir).createTestDirPackageJson('dev');
+        expect(packageJson.overrides).to.deep.equal({
+            '@alcalzone/esbuild-register': {
+                esbuild: '^0.25.0',
+            },
+        });
+    });
+
+    it('allows the install scripts of js-controller and esbuild', () => {
+        const packageJson = new ControllerSetup(adapterDir, testDir).createTestDirPackageJson('dev');
+        expect(packageJson.allowScripts).to.deep.equal({
+            'iobroker.js-controller': true,
+            esbuild: true,
+        });
+    });
+});

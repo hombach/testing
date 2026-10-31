@@ -117,6 +117,45 @@ class ControllerSetup {
         await this.clearLogDir();
         debug('  => done!');
     }
+    /**
+     * Creates the contents of the package.json in the test directory
+     *
+     * @param controllerVersion The version (or dist-tag) of JS-Controller to install
+     */
+    createTestDirPackageJson(controllerVersion) {
+        return {
+            name: path.basename(this.testDir),
+            version: '1.0.0',
+            main: 'index.js',
+            scripts: {
+                test: 'echo "Error: no test specified" && exit 1',
+            },
+            keywords: [],
+            author: '',
+            license: 'ISC',
+            dependencies: {
+                [`${this.appName}.js-controller`]: controllerVersion,
+                // @alcalzone/esbuild-register is needed to run TypeScript adapters
+                '@alcalzone/esbuild-register': '^2.5.1-1',
+            },
+            // @alcalzone/esbuild-register@2.5.1-1 (the latest version) depends on esbuild@^0.11.5,
+            // which is affected by GHSA-67mh-4wv8-2f99. Force a fixed esbuild version, but only
+            // for esbuild-register, so an esbuild dependency of the adapter itself is not touched
+            overrides: {
+                '@alcalzone/esbuild-register': {
+                    esbuild: '^0.25.0',
+                },
+            },
+            // npm >= 12 blocks dependency install scripts by default:
+            // - js-controller needs its install script ("setup first") to create the database
+            // - esbuild (used by @alcalzone/esbuild-register) downloads its binary
+            allowScripts: {
+                [`${this.appName}.js-controller`]: true,
+                esbuild: true,
+            },
+            description: '',
+        };
+    }
     async prepareTestDir(controllerVersion) {
         const nodeMajorVersion = parseInt(process.versions.node.split('.')[0], 10);
         // js-controller 7.2.3 dropped support for Node.js 18 and 20. If no specific
@@ -136,30 +175,7 @@ class ControllerSetup {
             await this.clearTestDir();
         }
         // Write the package.json
-        const packageJson = {
-            name: path.basename(this.testDir),
-            version: '1.0.0',
-            main: 'index.js',
-            scripts: {
-                test: 'echo "Error: no test specified" && exit 1',
-            },
-            keywords: [],
-            author: '',
-            license: 'ISC',
-            dependencies: {
-                [`${this.appName}.js-controller`]: controllerVersion,
-                // @alcalzone/esbuild-register is needed to run TypeScript adapters
-                '@alcalzone/esbuild-register': '^2.5.1-1',
-            },
-            // npm >= 12 blocks dependency install scripts by default:
-            // - js-controller needs its install script ("setup first") to create the database
-            // - esbuild (used by @alcalzone/esbuild-register) downloads its binary
-            allowScripts: {
-                [`${this.appName}.js-controller`]: true,
-                esbuild: true,
-            },
-            description: '',
-        };
+        const packageJson = this.createTestDirPackageJson(controllerVersion);
         await (0, fs_extra_1.writeJSON)(path.join(this.testDir, 'package.json'), packageJson, {
             spaces: 2,
         });
